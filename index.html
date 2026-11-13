@@ -178,16 +178,10 @@ nav.tabs button[aria-selected=true]{color:var(--label)}
       </div>
     </div>
 
-    <div class="card">
-      <h3>What is he eating?</h3>
-      <div class="foods" id="foodChips"></div>
-      <div class="row">
-        <label class="f">Food<input id="fName" type="text" placeholder="e.g. Turkey sandwich and apple slices"></label>
-        <label class="f" style="flex:0 1 110px">Carbs (g)<input id="fCarbs" type="number" inputmode="decimal" min="0" step="0.5"></label>
-        <button class="btn small" id="fAdd" type="button" style="flex:0 0 auto">Add</button>
-      </div>
-      <div class="picked" id="picked"></div>
-      <div id="tagSeg" hidden></div>
+    <div class="card" id="resultCard">
+      <div id="answer"></div>
+      <div class="sheet" id="sheet" style="margin-top:12px"></div>
+      <div id="giveBox" class="stack" style="margin-top:12px"></div>
     </div>
 
     <div class="card">
@@ -200,10 +194,16 @@ nav.tabs button[aria-selected=true]{color:var(--label)}
       </div>
     </div>
 
-    <div class="card" id="resultCard">
-      <div class="sheet" id="sheet"></div>
-      <div id="answer"></div>
-      <div id="giveBox" class="stack"></div>
+    <div class="card">
+      <h3>What is he eating?</h3>
+      <div class="foods" id="foodChips"></div>
+      <div class="row">
+        <label class="f">Food<input id="fName" type="text" placeholder="e.g. Turkey sandwich and apple slices"></label>
+        <label class="f" style="flex:0 1 110px">Carbs (g)<input id="fCarbs" type="number" inputmode="decimal" min="0" step="0.5"></label>
+        <button class="btn small" id="fAdd" type="button" style="flex:0 0 auto">Add</button>
+      </div>
+      <div class="picked" id="picked"></div>
+      <div id="tagSeg" hidden></div>
     </div>
   </section>
 
