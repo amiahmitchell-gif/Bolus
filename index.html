@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2f5873">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Jackson's Bolus Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one-column phone app; worksheet-style boxes for the math; bottom tab bar. Colors borrowed from the insulin pen: slate blue body, orange label. */
+:root{
+  --bg:#f3f6f9; --surface:#ffffff; --ink:#1b2a38; --muted:#5d6e7e; --line:#d5dee7;
+  --pen:#2f5873; --pen-soft:#e3edf4; --label:#e05a1f; --label-soft:#fdeee6;
+  --ok:#1e7d4f; --ok-soft:#e2f4ea; --warn:#a86400; --warn-soft:#fff3d9; --bad:#c02631; --bad-soft:#fde6e7;
+  --night:#3b3f8f; --night-soft:#e8e9f8;
+  --display:"Bricolage Grotesque",ui-rounded,"Segoe UI",system-ui,sans-serif;
+  --body:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f161d; --surface:#17212b; --ink:#e6edf3; --muted:#9aabbb; --line:#2b3a48;
+  --pen:#8fbbd8; --pen-soft:#1e3242; --label:#ff8a52; --label-soft:#3a2216;
+  --ok:#5fd39a; --ok-soft:#163327; --warn:#f2b84b; --warn-soft:#352812; --bad:#ff6b74; --bad-soft:#3d171b;
+  --night:#aeb2ff; --night-soft:#23254a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f161d; --surface:#17212b; --ink:#e6edf3; --muted:#9aabbb; --line:#2b3a48;
+  --pen:#8fbbd8; --pen-soft:#1e3242; --label:#ff8a52; --label-soft:#3a2216;
+  --ok:#5fd39a; --ok-soft:#163327; --warn:#f2b84b; --warn-soft:#352812; --bad:#ff6b74; --bad-soft:#3d171b;
+  --night:#aeb2ff; --night-soft:#23254a; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px calc(96px + env(safe-area-inset-bottom,0px))}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+h1{font-size:1.45rem;font-weight:800;letter-spacing:-.01em}
+h2{font-size:1.15rem;font-weight:800}
+h3{font-size:1rem;font-weight:600}
+.tnum{font-variant-numeric:tabular-nums}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:4px 10px}
+.sub{color:var(--muted);font-size:.85rem}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 12px;font-weight:600;font-size:.85rem;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;font-family:var(--body)}
+.chip.day{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+.chip.night{border-color:var(--night);color:var(--night);background:var(--night-soft)}
+.stack{display:flex;flex-direction:column;gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.banner{border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:.95rem}
+.banner b{font-family:var(--display);font-size:1.02rem}
+.banner.bad{background:var(--bad-soft);color:var(--bad);border:1.5px solid var(--bad)}
+.banner.warn{background:var(--warn-soft);color:var(--warn);border:1.5px solid var(--warn)}
+.banner.info{background:var(--pen-soft);color:var(--pen);border:1.5px solid var(--pen)}
+.banner.night{background:var(--night-soft);color:var(--night);border:1.5px solid var(--night)}
+.banner p{margin:0;color:var(--ink)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.row>*{flex:1 1 120px;min-width:0}
+label.f{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:.88rem;color:var(--muted)}
+input[type=number],input[type=text],input[type=datetime-local],select{font:inherit;font-size:1.15rem;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;min-width:0}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--label);outline-offset:2px}
+.big-in{font-size:1.6rem!important;font-weight:700;font-family:var(--display)}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button,.tag{font:inherit;font-size:.9rem;font-weight:600;padding:8px 12px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+.seg button[aria-pressed=true],.tag[aria-pressed=true]{background:var(--pen);border-color:var(--pen);color:var(--surface)}
+.foods{display:flex;gap:6px;flex-wrap:wrap}
+.food{font:inherit;font-size:.85rem;padding:6px 10px;border-radius:999px;border:1.5px dashed var(--pen);background:transparent;color:var(--pen);cursor:pointer;font-weight:600}
+.picked{display:flex;flex-direction:column;gap:4px}
+.picked div{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.92rem;background:var(--bg);border-radius:8px;padding:6px 10px}
+.x{font:inherit;border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:1.1rem;padding:2px 6px}
+.checks{display:flex;flex-direction:column;gap:2px}
+.checks label{display:flex;gap:10px;align-items:center;padding:8px 2px;font-size:.95rem;cursor:pointer}
+.checks input{width:22px;height:22px;accent-color:var(--pen);flex:none}
+.auto{font-size:.75rem;color:var(--pen);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+/* worksheet */
+.sheet{display:flex;flex-direction:column;gap:14px}
+.step h3{font-size:.95rem;margin-bottom:6px}
+.eq{display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap}
+.box{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:62px;flex:1 1 62px}
+.box span.v{display:flex;align-items:center;justify-content:center;width:100%;min-height:46px;border:3px solid var(--ink);border-radius:4px;font-family:var(--display);font-weight:800;font-size:1.2rem;background:var(--surface);font-variant-numeric:tabular-nums}
+.box small{font-size:.68rem;color:var(--muted);text-align:center;line-height:1.15}
+.box.skip span.v{border-style:dashed;color:var(--muted);text-decoration:line-through}
+.box.final span.v{border-color:var(--label);border-width:4px;color:var(--label)}
+.op{font-family:var(--display);font-size:1.3rem;font-weight:800;padding-top:10px;color:var(--muted)}
+.why{font-size:.85rem;color:var(--muted);margin:0}
+.why li{margin-bottom:2px}
+.answer{border-radius:14px;padding:18px 16px;text-align:center;display:flex;flex-direction:column;gap:4px;background:var(--label-soft);border:2px solid var(--label)}
+.answer .n{font-family:var(--display);font-weight:800;font-size:3rem;line-height:1;color:var(--label);font-variant-numeric:tabular-nums}
+.answer.zero{background:var(--bad-soft);border-color:var(--bad)}
+.answer.zero .n{color:var(--bad);font-size:2rem}
+.answer.wait{background:var(--surface);border-color:var(--line)}
+.answer.wait .n{color:var(--muted);font-size:1.6rem}
+.btn{font:inherit;font-weight:700;font-size:1rem;border-radius:12px;padding:13px 16px;border:0;background:var(--pen);color:var(--surface);cursor:pointer}
+.btn.alt{background:var(--bg);color:var(--ink);border:1.5px solid var(--line)}
+.btn.orange{background:var(--label);color:#fff}
+.btn.danger{background:var(--bad);color:#fff}
+.btn.small{padding:8px 12px;font-size:.88rem;border-radius:10px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.stepper{display:flex;align-items:center;gap:10px;justify-content:center}
+.stepper button{width:48px;height:48px;border-radius:12px;font-size:1.5rem;font-weight:800;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+.stepper output{font-family:var(--display);font-weight:800;font-size:1.6rem;min-width:110px;text-align:center}
+/* log */
+.day h3{font-size:.8rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:8px 0 6px}
+.entry{display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--line);margin-bottom:8px}
+.entry .hd{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.pill{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:var(--pen-soft);color:var(--pen)}
+.pill.low{background:var(--bad-soft);color:var(--bad)}
+.pill.basal{background:var(--night-soft);color:var(--night)}
+.pill.snack{background:var(--ok-soft);color:var(--ok)}
+.meta{font-size:.88rem;color:var(--muted)}
+.kv{display:flex;gap:14px;flex-wrap:wrap;font-size:.95rem}
+.kv b{font-family:var(--display)}
+.inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.inline input{max-width:120px;font-size:1rem;padding:8px 10px}
+/* trends */
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.92rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+th{font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+.up{color:var(--bad);font-weight:700}.down{color:var(--ok);font-weight:700}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--bg);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:2px}
+.stat b{font-family:var(--display);font-size:1.4rem;font-variant-numeric:tabular-nums}
+.stat span{font-size:.75rem;color:var(--muted)}
+svg text{fill:var(--muted);font-family:var(--body);font-size:10px}
+.empty{color:var(--muted);font-size:.92rem;text-align:center;padding:18px 8px}
+.disclaimer{font-size:.8rem;color:var(--muted);text-align:center;padding:8px 4px}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+nav.tabs .in{display:flex;max-width:560px;width:100%}
+nav.tabs button{flex:1;font:inherit;font-size:.8rem;font-weight:700;padding:10px 4px 12px;border:0;background:transparent;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+nav.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2}
+nav.tabs button[aria-selected=true]{color:var(--label)}
+.hist{font-size:.88rem;display:flex;flex-direction:column;gap:4px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;z-index:20;max-width:90vw}
+@media (prefers-reduced-motion:no-preference){.answer{transition:background .2s,border-color .2s}}
+</style>
+
+<style>:root{padding-top:env(safe-area-inset-top,0px)}body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Jackson's Bolus</h1>
+      <div class="sub tnum" id="sumline">Carb ratio 60 · Target 120 · Factor 100</div>
+    </div>
+    <button class="chip day" id="modeChip" type="button" aria-label="Switch day or night factor" hidden>☀ Day</button>
+  </header>
+
+  <div class="stack" id="banners"></div>
+
+  <!-- CALCULATE -->
+  <section id="v-calc" class="stack" style="margin-top:12px">
+    <div class="card">
+      <div class="row">
+        <label class="f">Blood sugar (finger stick)
+          <input id="bg" class="big-in tnum" type="number" inputmode="numeric" min="20" max="600" placeholder="mg/dL">
+        </label>
+        <label class="f">Carbs (grams)
+          <input id="carbs" class="big-in tnum" type="number" inputmode="decimal" min="0" step="0.5" placeholder="0">
+        </label>
+      </div>
+      <div class="row">
+        <label class="f">Carb ratio (today's)
+          <input id="ratioIn" class="big-in tnum" type="number" inputmode="decimal" min="1" step="1" placeholder="e.g. 60">
+        </label>
+        <label class="f">Correction factor
+          <input id="factorIn" class="big-in tnum" type="number" inputmode="numeric" min="1" step="1" placeholder="100 or 200">
+        </label>
+      </div>
+      <p class="sub" style="margin:0">Type these every time from his current care plan. Target is set to 120 in Settings.</p>
+      <div class="seg" id="mealSeg" role="group" aria-label="Meal">
+        <button type="button" data-meal="Breakfast" aria-pressed="false">Breakfast</button>
+        <button type="button" data-meal="Lunch" aria-pressed="false">Lunch</button>
+        <button type="button" data-meal="Dinner" aria-pressed="false">Dinner</button>
+        <button type="button" data-meal="Snack" aria-pressed="false">Snack</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>What is he eating?</h3>
+      <div class="foods" id="foodChips"></div>
+      <div class="row">
+        <label class="f">Food<input id="fName" type="text" placeholder="e.g. Turkey sandwich and apple slices"></label>
+        <label class="f" style="flex:0 1 110px">Carbs (g)<input id="fCarbs" type="number" inputmode="decimal" min="0" step="0.5"></label>
+        <button class="btn small" id="fAdd" type="button" style="flex:0 0 auto">Add</button>
+      </div>
+      <div class="picked" id="picked"></div>
+      <div id="tagSeg" hidden></div>
+    </div>
+
+    <div class="card">
+      <h3>Before you dose</h3>
+      <div class="checks">
+        <label><input type="checkbox" id="cExercise"> Hard exercise in the last hour</label>
+        <label><input type="checkbox" id="cLow"> Low treated in the last 3 hours <span class="auto" id="lowAuto" hidden>from log</span></label>
+        <label><input type="checkbox" id="cBed"> Bedtime or overnight</label>
+        <label><input type="checkbox" id="cSick"> Sick or has a fever</label>
+      </div>
+    </div>
+
+    <div class="card" id="resultCard">
+      <div class="sheet" id="sheet"></div>
+      <div id="answer"></div>
+      <div id="giveBox" class="stack"></div>
+    </div>
+  </section>
+
+  <!-- LOG -->
+  <section id="v-log" class="stack" style="margin-top:12px" hidden>
+    <div class="card">
+      <h2>Add to the log</h2>
+      <div class="seg" id="quickSeg">
+        <button type="button" data-q="bg">Blood sugar check</button>
+        <button type="button" data-q="low">Low treated</button>
+        <button type="button" data-q="snack">0-carb snack</button>
+        <button type="button" data-q="basal">Long-acting</button>
+        <button type="button" data-q="dose">Past dose</button>
+      </div>
+      <div id="quickForm" class="stack"></div>
+    </div>
+    <div id="logList"></div>
+  </section>
+
+  <!-- TRENDS -->
+  <section id="v-trends" class="stack" style="margin-top:12px" hidden></section>
+
+  <!-- SETTINGS -->
+  <section id="v-settings" class="stack" style="margin-top:12px" hidden>
+    <div class="card">
+      <h2>His numbers</h2>
+      <p class="sub" style="margin:0">The carb ratio and correction factor are typed on the calculator every time. Only the target is saved here.</p>
+      <div class="row">
+        <label class="f" hidden>Carb ratio (1 unit per __ g)<input id="sRatio" type="number" inputmode="decimal" min="1" step="1"></label>
+        <label class="f">Target<input id="sTarget" type="number" inputmode="numeric" min="60" step="1"></label>
+      </div>
+      <div class="row" hidden>
+        <label class="f">Correction factor, day<input id="sDay" type="number" inputmode="numeric" min="1" step="1"></label>
+        <label class="f">Correction factor, after dinner<input id="sNight" type="number" inputmode="numeric" min="1" step="1"></label>
+      </div>
+      <div class="row">
+        <label class="f" hidden>Remind me to check every (days)<input id="sReview" type="number" inputmode="numeric" min="1" step="1"></label>
+        <label class="f">Ask "are you sure?" above (units)<input id="sMax" type="number" inputmode="decimal" min="0.5" step="0.5"></label>
+      </div>
+      <div class="row">
+        <button class="btn" id="sSave" type="button">Save changes</button>
+        <button class="btn alt" id="sSame" type="button" hidden>Still the same</button>
+      </div>
+      <div class="sub" id="sLast"></div>
+    </div>
+    <div class="card">
+      <h2>Saved foods</h2>
+      <p class="sub" style="margin:0">Foods typed on the calculator are saved here automatically and show up as quick buttons next time.</p>
+      <div class="row">
+        <label class="f">Food<input id="sfName" type="text" placeholder="e.g. Goldfish pouch"></label>
+        <label class="f" style="flex:0 1 110px">Carbs (g)<input id="sfCarbs" type="number" inputmode="decimal" min="0" step="0.5"></label>
+        <button class="btn small" id="sfAdd" type="button" style="flex:0 0 auto">Save</button>
+      </div>
+      <div class="picked" id="savedFoods"></div>
+    </div>
+    <div class="card">
+      <h2>Change history</h2>
+      <div class="hist" id="hist"></div>
+    </div>
+    <p class="disclaimer" id="storeNote"></p>
+  </section>
+
+  <p class="disclaimer">This follows the bolus worksheet from Jackson's care team. It helps with the math. It does not replace his care team. If a number looks wrong, or he seems unwell, call them.</p>
+</div>
+
+<div id="gate" hidden style="position:fixed;inset:0;z-index:30;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))">
+  <div class="card" style="max-width:380px;width:100%;text-align:center">
+    <img src="icon-192.png" alt="" width="72" height="72" style="margin:0 auto;border-radius:16px">
+    <h1>Jackson's Bolus</h1>
+    <p class="sub" style="margin:0">Sign in with Google to open his shared log.</p>
+    <p id="gateMsg" style="margin:0;color:var(--bad);font-weight:600"></p>
+    <button class="btn" id="gateIn" type="button">Sign in with Google</button>
+    <button class="btn alt" id="gateOut" type="button" hidden>Sign out</button>
+  </div>
+</div>
+<nav class="tabs" aria-label="Sections"><div class="in" role="tablist">
+  <button type="button" role="tab" data-v="calc" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M14 12h2M8 16h2M14 16h2"/></svg>Calculate</button>
+  <button type="button" role="tab" data-v="log" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>Log</button>
+  <button type="button" role="tab" data-v="trends" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Trends</button>
+  <button type="button" role="tab" data-v="settings" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>Settings</button>
+</div></nav>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script>
+if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
+(function(){
+"use strict";
+const DEFAULTS={ratio:60,target:120,dayFactor:100,nightFactor:200,reviewDays:3,maxUnits:3,nightMode:false,lastReviewed:null};
+const TAGS=["Candy / sweets","Bread / pasta / rice","Fruit / juice","Balanced (protein or fat)","Fast food / greasy","Milk / yogurt"];
+const HOUR=3600000, GAP=3*HOUR;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num=v=>{const n=parseFloat(v);return isFinite(n)?n:null};
+const fmtU=u=>{if(u==null)return"–";const s=(Math.round(u*100)/100).toString();return s};
+const fmt2=x=>(Math.round(x*100)/100).toFixed(2).replace(/0$/,"").replace(/\.0$/,"");
+const tm=t=>new Date(t).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"});
+const dayLabel=t=>{const d=new Date(t),n=new Date();const y=new Date();y.setDate(n.getDate()-1);
+  if(d.toDateString()===n.toDateString())return"Today";if(d.toDateString()===y.toDateString())return"Yesterday";
+  return d.toLocaleDateString([], {weekday:"short",month:"short",day:"numeric"})};
+const dt=t=>new Date(t).toLocaleDateString([], {month:"numeric",day:"numeric"})+" "+tm(t);
+
+/* ---------- rounding: the worksheet's ½-unit rules ---------- */
+function roundHalf(x){
+  if(!(x>0))return 0;
+  const t=Math.round(x*10+1e-9)/10;           // to tenths first
+  const whole=Math.floor(t+1e-9);
+  const tenth=Math.round((t-whole)*10);
+  if(tenth===0||tenth<=3)return whole;          // .1–.3 round down to whole unit
+  if(tenth<=7)return whole+0.5;                 // .4–.7 round to ½ unit
+  return whole+1;                               // .8–.9 round up to whole unit
+}
+window.__roundHalf=roundHalf;
+
+/* ---------- storage: shared db when available, else this phone ---------- */
+const S={settings:{...DEFAULTS},settingsExists:false,log:[],foods:[],history:[],mode:"local"};
+let db=null;
+const LS="jackson-bolus-v1";
+function lsLoad(){try{const r=JSON.parse(localStorage.getItem(LS)||"null");if(r){S.settings={...DEFAULTS,...(r.settings||{})};S.settingsExists=!!r.settings;S.log=r.log||[];S.foods=r.foods||[];S.history=r.history||[]}}catch(e){}}
+function lsSave(){try{localStorage.setItem(LS,JSON.stringify({settings:S.settingsExists?S.settings:null,log:S.log,foods:S.foods,history:S.history}))}catch(e){}}
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+async function saveSettings(patch){
+  S.settings={...S.settings,...patch};S.settingsExists=true;
+  if(db){try{await db.doc("app/settings").set({...S.settings})}catch(e){toast("Could not save. Check your connection.")}}
+  else{lsSave()} renderAll();
+}
+async function addDoc(coll,data){
+  const id=uid();const row={...data,id};
+  if(db){try{await db.collection(coll).doc(id).set(data)}catch(e){toast(e&&e.code==="quota_exceeded"?"Storage is full. Delete old entries.":"Could not save. Check your connection.");return}}
+  else{S[coll==="log"?"log":coll==="foods"?"foods":"history"].push(row);lsSave();renderAll()}
+}
+async function updDoc(coll,id,patch){
+  if(db){try{await db.collection(coll).doc(id).update(patch)}catch(e){toast("Could not save.")}}
+  else{const arr=S[coll];const r=arr.find(x=>x.id===id);if(r)Object.assign(r,patch);lsSave();renderAll()}
+}
+async function delDoc(coll,id){
+  if(db){try{await db.collection(coll).doc(id).delete()}catch(e){toast("Could not delete.")}}
+  else{S[coll]=S[coll].filter(x=>x.id!==id);lsSave();renderAll()}
+}
+function connectDb(){
+  const cfg=window.FIREBASE_CONFIG;
+  if(!cfg||!window.firebase){return}
+  try{firebase.initializeApp(cfg)}catch(e){}
+  const fs=firebase.firestore();
+  try{fs.enablePersistence({synchronizeTabs:true}).catch(()=>{})}catch(e){}
+  const auth=firebase.auth();
+  auth.getRedirectResult().catch(e=>{showGate("Sign-in didn't finish. Try again.")});
+  auth.onAuthStateChanged(u=>{
+    if(!u){db=null;showGate();return}
+    hideGate();startSync(fs,u);
+  });
+}
+let unsubs=[];
+function startSync(fs,u){
+  unsubs.forEach(f=>f());unsubs=[];
+  db=fs;S.mode="shared";S.user=u.email;
+  const timer=setTimeout(()=>{S.slow=true;renderBanners()},10000);
+  const done=()=>{clearTimeout(timer);S.slow=false};
+  const denied=e=>{done();if(e&&e.code==="permission-denied"){showGate("The account "+u.email+" isn't allowed to see this log. Ask Amiah to add it, or sign in with a different Google account.",true)}};
+  unsubs.push(db.doc("app/settings").onSnapshot({includeMetadataChanges:false},s=>{if(!s.metadata.fromCache)done();S.settingsExists=s.exists;S.settings={...DEFAULTS,...(s.exists?s.data():{})};renderAll()},denied));
+  unsubs.push(db.collection("log").orderBy("at","desc").limit(1000).onSnapshot(q=>{if(!q.metadata.fromCache)done();S.log=q.docs.map(d=>({...d.data(),id:d.id}));renderAll()},denied));
+  unsubs.push(db.collection("foods").onSnapshot(q=>{S.foods=q.docs.map(d=>({...d.data(),id:d.id}));renderAll()},denied));
+  unsubs.push(db.collection("history").orderBy("at","desc").limit(200).onSnapshot(q=>{S.history=q.docs.map(d=>({...d.data(),id:d.id}));renderAll()},denied));
+}
+function showGate(msg,signOut){const g=document.getElementById("gate");g.hidden=false;document.getElementById("gateMsg").textContent=msg||"";document.getElementById("gateOut").hidden=!signOut}
+function hideGate(){document.getElementById("gate").hidden=true}
+document.getElementById("gateIn").addEventListener("click",()=>{const p=new firebase.auth.GoogleAuthProvider();firebase.auth().signInWithRedirect(p)});
+document.getElementById("gateOut").addEventListener("click",()=>{firebase.auth().signOut()});
+
+/* ---------- calculator state ---------- */
+const C={meal:null,foods:[],tags:[],given:null,givenTouched:false,confirmBig:false};
+function lastInsulin(){let best=null;for(const e of S.log){if(e.type==="dose"&&(e.given||0)>0){if(!best||e.at>best.at)best=e}}return best}
+function recentLow(now){return S.log.some(e=>e.type==="low"&&now-e.at<GAP&&e.at<=now)}
+
+function compute(){
+  const now=Date.now(),st=S.settings;
+  const bg=num($("bg").value);const carbs=num($("carbs").value)||0;
+  const night=false;const factor=num($("factorIn").value);const ratio=num($("ratioIn").value);
+  const li=lastInsulin();const waitUntil=li?li.at+GAP:0;const blocked=li&&now<waitUntil;
+  const autoLow=recentLow(now);
+  const r={bg,carbs,night,factor,ratio,target:st.target,blocked,waitUntil,li,skip:[],warn:[],stop:null};
+  r.carbPart=carbs>0&&ratio?carbs/ratio:0;
+  r.amount=bg!=null?bg-st.target:null;
+  if(bg!=null&&bg<=70){r.stop="low"}
+  if(bg!=null&&r.amount<=0)r.skip.push("Blood sugar is at or below target ("+st.target+")");
+  if($("cExercise").checked)r.skip.push("Hard exercise in the last hour");
+  if($("cLow").checked||autoLow)r.skip.push("A low was treated in the last 3 hours");
+  if($("cBed").checked)r.skip.push("Bedtime or overnight");
+  r.corrOn=bg!=null&&r.skip.length===0&&r.amount>0;
+  r.corrPart=r.corrOn&&factor?r.amount/factor:0;
+  r.total=r.carbPart+r.corrPart;
+  r.rounded=roundHalf(r.total);
+  r.autoLow=autoLow;
+  if($("cSick").checked||(bg!=null&&bg>300))r.ketones=true;
+  if(bg!=null&&bg>70&&bg<=80)r.warn.push("lowish");
+  return r;
+}
+
+function box(v,label,cls){return '<div class="box '+(cls||"")+'"><span class="v">'+esc(v)+'</span><small>'+esc(label)+'</small></div>'}
+const op=s=>'<div class="op" aria-hidden="true">'+s+'</div>';
+
+function renderCalc(){
+  const r=compute();
+  $("lowAuto").hidden=!r.autoLow; if(r.autoLow)$("cLow").checked=true;
+  const sk=!r.corrOn;
+  let h='';
+  h+='<div class="step"><h3>1) Carbohydrate bolus</h3><div class="eq">'+box(r.carbs||0,"Grams of carbs")+op("÷")+box(r.ratio==null?"?":r.ratio,"Carb ratio")+op("=")+box(fmt2(r.carbPart),"Carb bolus")+'</div></div>';
+  h+='<div class="step"><h3>2) Correction bolus</h3><div class="eq">'+
+    box(r.bg==null?"?":r.bg,"Blood sugar",sk?"skip":"")+op("−")+box(r.target,"Target",sk?"skip":"")+op("=")+box(r.amount==null?"?":r.amount,"Amount to correct",sk?"skip":"")+op("÷")+box(r.factor==null?"?":r.factor,"Correction factor",sk?"skip":"")+op("=")+box(sk?"0":fmt2(r.corrPart),"Correction bolus",sk?"skip":"")+'</div>';
+  if(r.skip.length)h+='<ul class="why">'+r.skip.map(s=>'<li>No correction: '+esc(s)+'</li>').join("")+'</ul>';
+  h+='</div>';
+  h+='<div class="step"><h3>3) Total, rounded to the pen</h3><div class="eq">'+box(fmt2(r.carbPart),"Carb bolus")+op("+")+box(fmt2(r.corrPart),"Correction")+op("=")+box(fmt2(r.total),"Total")+op("→")+box(fmtU(r.rounded),"Rounded (½-unit rules)","final")+'</div></div>';
+  $("sheet").innerHTML=h;
+
+  // answer
+  let a='',give='';
+  if((r.ratio==null||r.factor==null)&&r.stop!=="low"){
+    a='<div class="answer wait"><div class="n">Type his carb ratio and correction factor</div><div class="sub">Use the numbers from his current care plan.</div></div>';
+  }else if(r.bg==null){
+    a='<div class="answer wait"><div class="n">Enter his blood sugar</div><div class="sub">Use a finger-stick reading, not the Dexcom.</div></div>';
+  }else if(r.stop==="low"){
+    a='<div class="answer zero"><div class="n">No insulin. Treat the low.</div><div>Blood sugar is '+r.bg+'. Give <b>15 g of fast-acting carbs right away</b>, then recheck.</div></div>';
+    give='<button class="btn danger" type="button" data-act="logLow">Log low treated (15 g fast-acting)</button>';
+  }else if(r.blocked){
+    a='<div class="answer zero"><div class="n">No insulin until '+tm(r.waitUntil)+'</div><div>Last insulin was '+fmtU(r.li.given)+' u at '+tm(r.li.at)+'. You always wait 3 hours. 0-carb snacks only for now.</div><div class="sub">If it were time: '+fmtU(r.rounded)+' u.</div></div>';
+    give='<button class="btn alt" type="button" data-act="logBg">Log this blood sugar only</button>';
+  }else{
+    if(C.given==null||!C.givenTouched)C.given=r.rounded;
+    const tooSmall=r.rounded===0;
+    a='<div class="answer'+(tooSmall?' wait':'')+'"><div class="sub">Give</div><div class="n">'+fmtU(r.rounded)+'</div><div>unit'+(r.rounded===1?'':'s')+' of fast-acting insulin</div>'+(tooSmall?'<div class="sub">The total rounds to 0, so no insulin is needed for this.</div>':'')+'</div>';
+    give='<div class="sub" style="text-align:center">Units actually given</div><div class="stepper"><button type="button" data-act="minus" aria-label="Less">−</button><output class="tnum" id="givenOut">'+fmtU(C.given)+' u</output><button type="button" data-act="plus" aria-label="More">+</button></div>';
+    const big=C.given>S.settings.maxUnits;
+    if(big&&!C.confirmBig)give+='<div class="banner warn"><b>That is more than '+fmtU(S.settings.maxUnits)+' units.</b><p>Double-check the carbs and the blood sugar before giving it.</p><button class="btn small" type="button" data-act="confirmBig">I checked, it is right</button></div>';
+    give+='<button class="btn orange" type="button" data-act="logDose" '+(big&&!C.confirmBig?'disabled':'')+'>'+(C.given>0?'Log dose given':'Log meal (no insulin)')+'</button>';
+  }
+  let extra='';
+  if(r.warn.includes("lowish"))extra+='<div class="banner warn"><b>'+r.bg+' is on the low side.</b><p>If he is dropping fast, give a 15 g snack with complex carbs, like peanut butter toast or a nut granola bar.</p></div>';
+  if(r.ketones)extra+='<div class="banner warn"><b>Check ketones.</b><p>Blood sugar over 300 or sick means check ketones, no matter the number.</p></div>';
+  const ld=S.log.filter(e=>e.type==="dose"&&e.ratio).sort((x,y)=>y.at-x.at)[0];
+  if(ld&&r.ratio!=null&&r.ratio!==ld.ratio)extra+='<div class="banner info"><b>Carb ratio is different from last time.</b><p>The last dose used '+esc(ld.ratio)+'. Make sure '+esc(r.ratio)+' is the new number from his care team.</p></div>';
+  if(false&&r.night&&!$("cBed").checked&&r.bg!=null&&!r.stop&&!r.blocked)extra+='<div class="banner night"><b>After dinner: using factor '+r.factor+'.</b><p>If this is bedtime or overnight, check "Bedtime or overnight". There is no correction then.</p></div>';
+  $("answer").innerHTML=a+(extra?'<div class="stack" style="margin-top:12px">'+extra+'</div>':'');
+  $("giveBox").innerHTML=give;
+}
+
+/* ---------- foods on calculator ---------- */
+function renderFoods(){
+  const fc=$("foodChips");
+  fc.innerHTML=S.foods.length?S.foods.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(f=>'<button type="button" class="food" data-food="'+esc(f.id)+'">'+esc(f.name)+' · '+fmtU(f.carbs)+' g</button>').join(""):'<span class="sub">Saved foods appear here. Add them in Settings.</span>';
+  $("picked").innerHTML=C.foods.map((f,i)=>'<div><span>'+esc(f.name)+'</span><span class="tnum">'+fmtU(f.carbs)+' g <button class="x" type="button" data-unpick="'+i+'" aria-label="Remove">×</button></span></div>').join("")+
+    (C.foods.length?'<div><b>Total</b><b class="tnum">'+fmtU(C.foods.reduce((s,f)=>s+(f.carbs||0),0))+' g</b></div>':'');
+  $("tagSeg").innerHTML=TAGS.map(t=>'<button type="button" class="tag" data-tag="'+esc(t)+'" aria-pressed="'+C.tags.includes(t)+'">'+esc(t)+'</button>').join("");
+}
+function syncCarbsFromFoods(){if(C.foods.length){$("carbs").value=Math.round(C.foods.reduce((s,f)=>s+(f.carbs||0),0)*10)/10}}
+
+/* ---------- header, banners ---------- */
+function renderHeader(){
+  const st=S.settings;const chip=$("modeChip");
+  chip.className="chip "+(st.nightMode?"night":"day");
+  chip.textContent=st.nightMode?"☾ After dinner":"☀ Day";
+  $("sumline").textContent="Target "+st.target;
+}
+function renderBanners(){
+  const st=S.settings;let h='';const now=Date.now();
+  if(S.slow)h+='<div class="banner info"><b>Still connecting.</b><p>The shared log can\'t be reached yet. What you see may be out of date.</p></div>';
+  const due=false&&now-st.lastReviewed>st.reviewDays*86400000;
+  if(due)h+='<div class="banner info"><b>Are his numbers still the same?</b><p>'+(st.lastReviewed?'Last checked '+new Date(st.lastReviewed).toLocaleDateString([], {weekday:"short",month:"numeric",day:"numeric"})+'. ':'')+'Carb ratio '+fmtU(st.ratio)+', target '+st.target+', factor '+st.dayFactor+' day / '+st.nightFactor+' after dinner.</p><div class="row"><button class="btn small" type="button" data-act="same">Still the same</button><button class="btn small alt" type="button" data-act="goSettings">Update</button></div></div>';
+  $("banners").innerHTML=h;
+}
+
+/* ---------- log ---------- */
+const TYPE={dose:["Dose",""],bg:["Blood sugar",""],low:["Low treated","low"],snack:["0-carb snack","snack"],basal:["Long-acting","basal"]};
+function renderLog(){
+  const list=S.log.slice().sort((a,b)=>b.at-a.at);
+  if(!list.length){$("logList").innerHTML='<div class="card empty">Nothing logged yet. Doses you log from the calculator show up here, with the time, blood sugar, carbs and food. Add a 2-hour blood sugar later to build the trends.</div>';return}
+  let h='',cur='';
+  for(const e of list){
+    const d=dayLabel(e.at);if(d!==cur){if(cur)h+='</div>';h+='<div class="day"><h3>'+esc(d)+'</h3>';cur=d}
+    const t=TYPE[e.type]||[e.type,""];
+    h+='<div class="entry"><div class="hd"><span><span class="pill '+t[1]+'">'+esc(e.type==="dose"&&e.meal?e.meal:t[0])+'</span> <b class="tnum">'+tm(e.at)+'</b></span>';
+    if(e.type==="dose"||e.type==="basal")h+='<b class="tnum" style="font-family:var(--display);font-size:1.15rem;color:var(--label)">'+fmtU(e.given)+' u</b>';
+    h+='</div><div class="kv tnum">';
+    if(e.bg!=null)h+='<span>BG <b>'+e.bg+'</b></span>';
+    if(e.carbs)h+='<span>Carbs <b>'+fmtU(e.carbs)+' g</b></span>';
+    if(e.type==="low"&&e.grams)h+='<span><b>'+fmtU(e.grams)+' g</b> '+esc(e.kind||"")+'</span>';
+    if(e.afterBg!=null)h+='<span>2-hr BG <b>'+e.afterBg+'</b> <span class="'+(e.afterBg-(e.bg||0)>0?'up':'down')+'">('+(e.afterBg-(e.bg||0)>0?'+':'')+(e.afterBg-(e.bg||0))+')</span></span>';
+    h+='</div>';
+    if(e.foods&&e.foods.length)h+='<div class="meta">'+e.foods.map(f=>esc(f.name)).join(", ")+'</div>';
+    if(e.tags&&e.tags.length)h+='<div class="meta">'+e.tags.map(esc).join(" · ")+'</div>';
+    if(e.type==="dose"&&e.ratio)h+='<div class="meta tnum">Used ratio '+fmtU(e.ratio)+', target '+e.target+', factor '+e.factor+(e.rounded!=null&&e.rounded!==e.given?' · app said '+fmtU(e.rounded)+' u':'')+(e.skipped&&e.skipped.length?' · no correction: '+e.skipped.map(esc).join("; "):'')+'</div>';
+    if(e.note)h+='<div class="meta">'+esc(e.note)+'</div>';
+    h+='<div class="inline">';
+    if(e.type==="dose"&&e.afterBg==null)h+='<input type="number" inputmode="numeric" placeholder="2-hr BG" id="ab-'+esc(e.id)+'" aria-label="Blood sugar 2 hours after"><button class="btn small alt" type="button" data-after="'+esc(e.id)+'">Save</button>';
+    h+=(S.confirmDel===e.id?'<button class="btn small danger" type="button" data-del="'+esc(e.id)+'">Yes, delete</button><button class="btn small alt" type="button" data-nodel="1">Keep</button>':'<button class="x" type="button" data-askdel="'+esc(e.id)+'" style="margin-left:auto;font-size:.85rem">Delete</button>');
+    h+='</div></div>';
+  }
+  h+='</div>';
+  $("logList").innerHTML=h;
+}
+function nowLocal(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
+function renderQuick(kind){
+  S.quick=kind;
+  document.querySelectorAll("#quickSeg button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.q===kind)));
+  let h='';const when='<label class="f">When<input id="qAt" type="datetime-local" value="'+nowLocal()+'"></label>';
+  if(kind==="bg")h='<div class="row"><label class="f">Blood sugar<input id="qBg" type="number" inputmode="numeric"></label>'+when+'</div>';
+  if(kind==="low")h='<div class="row"><label class="f">Blood sugar<input id="qBg" type="number" inputmode="numeric"></label><label class="f">Grams given<input id="qG" type="number" inputmode="decimal" value="15"></label></div><div class="row"><label class="f">Kind<select id="qKind"><option>Fast-acting</option><option>Complex (PB toast, granola bar)</option></select></label>'+when+'</div>';
+  if(kind==="snack")h='<div class="row"><label class="f">What<input id="qNote" type="text" placeholder="e.g. cheese stick"></label>'+when+'</div>';
+  if(kind==="basal")h='<div class="row"><label class="f">Units<input id="qU" type="number" inputmode="decimal" step="0.5" value="3.5"></label>'+when+'</div><p class="sub" style="margin:0">Long-acting does not count toward the 3-hour wait.</p>';
+  if(kind==="dose")h='<div class="row"><label class="f">Units given<input id="qU" type="number" inputmode="decimal" step="0.5"></label><label class="f">Blood sugar<input id="qBg" type="number" inputmode="numeric"></label></div><div class="row"><label class="f">Carbs (g)<input id="qC" type="number" inputmode="decimal"></label><label class="f">Meal<select id="qMeal"><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select></label></div><div class="row">'+when+'</div><p class="sub" style="margin:0">Use this for a dose given without the calculator, so the 3-hour wait is right.</p>';
+  if(kind)h+='<button class="btn" type="button" data-act="quickSave">Save to log</button>';
+  $("quickForm").innerHTML=h;
+}
+async function quickSave(){
+  const k=S.quick;const at=new Date($("qAt").value).getTime()||Date.now();
+  if(k==="bg"){const bg=num($("qBg").value);if(bg==null)return toast("Enter the blood sugar.");await addDoc("log",{type:"bg",at,bg})}
+  if(k==="low"){await addDoc("log",{type:"low",at,bg:num($("qBg").value),grams:num($("qG").value)||15,kind:$("qKind").value})}
+  if(k==="snack"){await addDoc("log",{type:"snack",at,note:$("qNote").value.trim()})}
+  if(k==="basal"){const u=num($("qU").value);if(u==null)return toast("Enter the units.");await addDoc("log",{type:"basal",at,given:u})}
+  if(k==="dose"){const u=num($("qU").value);if(u==null)return toast("Enter the units.");const meal=$("qMeal").value;
+    await addDoc("log",{type:"dose",at,given:u,bg:num($("qBg").value),carbs:num($("qC").value)||0,meal});
+    if(meal==="Dinner"&&!S.settings.nightMode&&Date.now()-at<12*HOUR)await saveSettings({nightMode:true});}
+  renderQuick(null);toast("Saved to the log.");
+}
+
+/* ---------- trends ---------- */
+function mean(a){return a.length?a.reduce((s,x)=>s+x,0)/a.length:null}
+function renderTrends(){
+  const now=Date.now(),wk=now-7*86400000;
+  const readings=[];
+  for(const e of S.log){if(e.bg!=null)readings.push({at:e.at,v:e.bg});if(e.afterBg!=null)readings.push({at:e.afterAt||e.at+2*HOUR,v:e.afterBg})}
+  const r7=readings.filter(r=>r.at>=wk).sort((a,b)=>a.at-b.at);
+  const lows7=S.log.filter(e=>e.at>=wk&&(e.type==="low"||(e.bg!=null&&e.bg<=70))).length;
+  const inRange=r7.length?Math.round(100*r7.filter(r=>r.v>=70&&r.v<=180).length/r7.length):null;
+  let h='<div class="card"><h2>Last 7 days</h2><div class="stats">'+
+    '<div class="stat"><b>'+(r7.length?Math.round(mean(r7.map(r=>r.v))):"–")+'</b><span>Average BG</span></div>'+
+    '<div class="stat"><b>'+lows7+'</b><span>Lows (70 or under)</span></div>'+
+    '<div class="stat"><b>'+(inRange==null?"–":inRange+"%")+'</b><span>Readings 70–180</span></div></div>';
+  h+=chart(r7,wk,now)+'</div>';
+
+  const pairs=S.log.filter(e=>e.type==="dose"&&e.bg!=null&&e.afterBg!=null);
+  // by kind of carbs
+  const byTag={};for(const e of pairs){for(const t of(e.tags||[])){(byTag[t]=byTag[t]||[]).push(e)}}
+  h+='<div class="card"><h2>What happens after he eats</h2><p class="sub" style="margin:0">Change from the blood sugar before the meal to the 2-hour check. Add a 2-hour BG to logged doses to fill this in.</p>';
+  if(!pairs.length){h+='<div class="empty">No meals with a 2-hour check yet.</div>'}
+  else{
+    const rowsT=Object.entries(byTag).sort((a,b)=>b[1].length-a[1].length);
+    if(false)h+='<h3>By kind of carbs</h3><div class="tbl"><table><thead><tr><th>Kind</th><th>Meals</th><th>Avg change</th><th>Avg carbs</th></tr></thead><tbody>'+rowsT.map(([t,a])=>{const d=Math.round(mean(a.map(e=>e.afterBg-e.bg)));return'<tr><td>'+esc(t)+'</td><td>'+a.length+'</td><td class="'+(d>0?'up':'down')+'">'+(d>0?'+':'')+d+'</td><td>'+Math.round(mean(a.map(e=>e.carbs||0)))+' g</td></tr>'}).join("")+'</tbody></table></div>';
+    const byFood={};for(const e of pairs){for(const f of(e.foods||[])){(byFood[f.name]=byFood[f.name]||[]).push(e)}}
+    const rowsF=Object.entries(byFood).sort((a,b)=>b[1].length-a[1].length).slice(0,20);
+    if(rowsF.length)h+='<h3>By food</h3><div class="tbl"><table><thead><tr><th>Food</th><th>Times</th><th>Avg change</th></tr></thead><tbody>'+rowsF.map(([n,a])=>{const d=Math.round(mean(a.map(e=>e.afterBg-e.bg)));return'<tr><td>'+esc(n)+'</td><td>'+a.length+'</td><td class="'+(d>0?'up':'down')+'">'+(d>0?'+':'')+d+'</td></tr>'}).join("")+'</tbody></table></div>';
+  }
+  h+='</div>';
+  // by carb ratio
+  const doses=S.log.filter(e=>e.type==="dose"&&e.ratio);
+  const byR={};for(const e of doses){(byR[e.ratio]=byR[e.ratio]||[]).push(e)}
+  h+='<div class="card"><h2>By carb ratio</h2><p class="sub" style="margin:0">How each carb ratio has worked. Bring this to his care team when they adjust it.</p>';
+  const rr=Object.entries(byR).sort((a,b)=>Math.min(...b[1].map(e=>e.at))-Math.min(...a[1].map(e=>e.at)));
+  if(!rr.length)h+='<div class="empty">Doses logged from the calculator will be grouped here.</div>';
+  else h+='<div class="tbl"><table><thead><tr><th>Ratio</th><th>Doses</th><th>Avg 2-hr change</th><th>Lows within 4 hr</th></tr></thead><tbody>'+rr.map(([ratio,a])=>{
+    const p=a.filter(e=>e.bg!=null&&e.afterBg!=null);const d=p.length?Math.round(mean(p.map(e=>e.afterBg-e.bg))):null;
+    const lows=a.filter(e=>S.log.some(x=>x.at>e.at&&x.at-e.at<=4*HOUR&&(x.type==="low"||(x.bg!=null&&x.bg<=70)))).length;
+    return'<tr><td>'+esc(ratio)+':1</td><td>'+a.length+'</td><td'+(d==null?'':' class="'+(d>0?'up':'down')+'"')+'>'+(d==null?'–':(d>0?'+':'')+d)+'</td><td>'+lows+'</td></tr>'}).join("")+'</tbody></table></div>';
+  h+='</div><p class="disclaimer">Trends show what happened. Only his care team should change his ratio or factors.</p>';
+  $("v-trends").innerHTML=h;
+}
+function chart(r,t0,t1){
+  if(r.length<2)return'<div class="empty">The chart fills in after a few readings.</div>';
+  const W=320,H=150,L=28,R=8,T=8,B=20;const max=Math.max(300,...r.map(x=>x.v));const min=40;
+  const x=t=>L+(t-t0)/(t1-t0)*(W-L-R);const y=v=>T+(1-(v-min)/(max-min))*(H-T-B);
+  let s='<div class="tbl"><svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Blood sugar readings over 7 days">';
+  s+='<rect x="'+L+'" y="'+y(180)+'" width="'+(W-L-R)+'" height="'+(y(70)-y(180))+'" style="fill:var(--ok-soft)"/>';
+  for(const v of[70,120,180,300]){if(v<=max)s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(v)+'" y2="'+y(v)+'" style="stroke:var(--line)" stroke-width="1"/><text x="'+(L-4)+'" y="'+(y(v)+3)+'" text-anchor="end">'+v+'</text>'}
+  for(let i=0;i<=7;i++){const t=t0+i*86400000;if(i%2===1)s+='<text x="'+x(t)+'" y="'+(H-6)+'" text-anchor="middle">'+new Date(t).toLocaleDateString([], {weekday:"short"})+'</text>'}
+  s+='<polyline fill="none" style="stroke:var(--pen)" stroke-width="1.5" points="'+r.map(p=>x(p.at).toFixed(1)+","+y(p.v).toFixed(1)).join(" ")+'"/>';
+  for(const p of r){const c=p.v<=70?'var(--bad)':p.v>180?'var(--warn)':'var(--pen)';s+='<circle cx="'+x(p.at).toFixed(1)+'" cy="'+y(p.v).toFixed(1)+'" r="3" style="fill:'+c+'"/>'}
+  return s+'</svg></div>';
+}
+
+/* ---------- settings ---------- */
+function renderSettings(force){
+  const st=S.settings;
+  const set=(id,v)=>{const el=$(id);if(force||document.activeElement!==el)el.value=v};
+  if(force||!S.sDirty){set("sRatio",st.ratio);set("sTarget",st.target);set("sDay",st.dayFactor);set("sNight",st.nightFactor);set("sReview",st.reviewDays);set("sMax",st.maxUnits)}
+  $("sLast").textContent=st.lastReviewed?"Last confirmed "+new Date(st.lastReviewed).toLocaleString([], {weekday:"short",month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit"}):"Not confirmed yet. Check the numbers and tap Save or Still the same.";
+  $("savedFoods").innerHTML=S.foods.length?S.foods.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(f=>'<div><span>'+esc(f.name)+'</span><span class="tnum">'+fmtU(f.carbs)+' g <button class="x" type="button" data-delfood="'+esc(f.id)+'" aria-label="Delete">×</button></span></div>').join(""):'<span class="sub">No saved foods yet.</span>';
+  const hs=S.history.slice().sort((a,b)=>b.at-a.at);
+  $("hist").innerHTML=hs.length?hs.map(x=>'<div class="tnum"><b>'+new Date(x.at).toLocaleDateString([], {month:"numeric",day:"numeric",year:"2-digit"})+'</b> '+esc(x.what)+': '+esc(x.from)+' → '+esc(x.to)+'</div>').join(""):'<span class="sub">Changes you save show up here.</span>';
+  $("storeNote").textContent=S.mode==="shared"?"The log is shared between the family accounts allowed to see it. Signed in as "+(S.user||"")+".":"Not connected to the shared log yet. Entries are saved on this phone only.";
+}
+async function saveSettingsForm(){
+  const st=S.settings;const nv={ratio:num($("sRatio").value),target:num($("sTarget").value),dayFactor:num($("sDay").value),nightFactor:num($("sNight").value),reviewDays:num($("sReview").value),maxUnits:num($("sMax").value)};
+  for(const k in nv){if(nv[k]==null||nv[k]<=0)return toast("Every number needs a value above 0.")}
+  const names={ratio:"Carb ratio",target:"Target",dayFactor:"Day factor",nightFactor:"After-dinner factor"};
+  const changes=[];for(const k in names){if(nv[k]!==st[k])changes.push({what:names[k],from:String(st[k]),to:String(nv[k])})}
+  S.sDirty=false;
+  await saveSettings({...nv,lastReviewed:Date.now()});
+  for(const c of changes)await addDoc("history",{...c,at:Date.now()});
+  toast(changes.length?"Saved. New numbers are in use.":"Saved.");
+}
+
+/* ---------- actions ---------- */
+let toastT;function toast(m){let el=document.querySelector(".toast");if(!el){el=document.createElement("div");el.className="toast";el.setAttribute("role","status");document.body.appendChild(el)}el.textContent=m;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{el.hidden=true},2600)}
+async function logDose(){
+  const r=compute();if(r.bg==null||r.blocked||r.stop)return;
+  const entry={type:"dose",at:Date.now(),bg:r.bg,carbs:r.carbs,meal:C.meal||"Snack",foods:C.foods.slice(),tags:C.tags.slice(),carbPart:Math.round(r.carbPart*1000)/1000,corrPart:Math.round(r.corrPart*1000)/1000,total:Math.round(r.total*1000)/1000,rounded:r.rounded,given:C.given,ratio:r.ratio,target:r.target,factor:r.factor,night:r.night,skipped:r.skip};
+  await addDoc("log",entry);
+  if(entry.meal==="Dinner"&&!S.settings.nightMode)await saveSettings({nightMode:true});
+  if(entry.meal==="Breakfast"&&S.settings.nightMode)await saveSettings({nightMode:false});
+  resetCalc();toast(entry.given>0?"Logged "+fmtU(entry.given)+" u. Next insulin after "+tm(entry.at+GAP)+".":"Logged.");
+}
+function resetCalc(){$("bg").value="";$("carbs").value="";$("ratioIn").value="";$("factorIn").value="";C.foods=[];C.tags=[];C.given=null;C.givenTouched=false;C.confirmBig=false;["cExercise","cBed","cSick"].forEach(i=>$(i).checked=false);$("cLow").checked=false;setMeal(null);renderAll()}
+function setMeal(m){C.meal=m;document.querySelectorAll("#mealSeg button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.meal===m)))}
+function show(v){S.view=v;["calc","log","trends","settings"].forEach(k=>{$("v-"+k).hidden=k!==v});document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.v===v)));if(v==="settings")renderSettings(true);try{localStorage.setItem(LS+"-tab",v)}catch(e){}window.scrollTo(0,0)}
+
+document.addEventListener("click",async ev=>{
+  const b=ev.target.closest("button");if(!b)return;
+  if(b.dataset.v)return show(b.dataset.v);
+  if(b.dataset.meal){setMeal(C.meal===b.dataset.meal?null:b.dataset.meal);return}
+  if(b.dataset.tag){const t=b.dataset.tag;C.tags=C.tags.includes(t)?C.tags.filter(x=>x!==t):[...C.tags,t];renderFoods();return}
+  if(b.dataset.food){const f=S.foods.find(x=>x.id===b.dataset.food);if(f){C.foods.push({name:f.name,carbs:f.carbs});if(f.tag&&!C.tags.includes(f.tag))C.tags.push(f.tag);syncCarbsFromFoods();renderFoods();renderCalc()}return}
+  if(b.dataset.unpick!=null){C.foods.splice(+b.dataset.unpick,1);syncCarbsFromFoods();if(!C.foods.length)$("carbs").value="";renderFoods();renderCalc();return}
+  if(b.dataset.q){renderQuick(S.quick===b.dataset.q?null:b.dataset.q);return}
+  if(b.dataset.after){const v=num(($("ab-"+b.dataset.after)||{}).value);if(v==null)return toast("Enter the 2-hour blood sugar.");await updDoc("log",b.dataset.after,{afterBg:v,afterAt:Date.now()});toast("Saved.");return}
+  if(b.dataset.askdel){S.confirmDel=b.dataset.askdel;renderLog();return}
+  if(b.dataset.nodel){S.confirmDel=null;renderLog();return}
+  if(b.dataset.del){S.confirmDel=null;await delDoc("log",b.dataset.del);return}
+  if(b.dataset.delfood){await delDoc("foods",b.dataset.delfood);return}
+  const a=b.dataset.act;
+  if(a==="minus"){C.given=Math.max(0,(C.given||0)-0.5);C.givenTouched=true;C.confirmBig=false;renderCalc()}
+  if(a==="plus"){C.given=Math.min(30,(C.given||0)+0.5);C.givenTouched=true;C.confirmBig=false;renderCalc()}
+  if(a==="confirmBig"){C.confirmBig=true;renderCalc()}
+  if(a==="logDose")await logDose();
+  if(a==="logBg"){const r=compute();await addDoc("log",{type:"bg",at:Date.now(),bg:r.bg});resetCalc();toast("Blood sugar logged.")}
+  if(a==="logLow"){const r=compute();await addDoc("log",{type:"low",at:Date.now(),bg:r.bg,grams:15,kind:"Fast-acting"});resetCalc();toast("Low logged. Recheck in 15 minutes.")}
+  if(a==="same"){await saveSettings({lastReviewed:Date.now()});toast("Thanks. Numbers confirmed.")}
+  if(a==="goSettings")show("settings");
+  if(a==="quickSave")await quickSave();
+});
+$("modeChip").addEventListener("click",()=>saveSettings({nightMode:!S.settings.nightMode}));
+["bg","carbs","ratioIn","factorIn"].forEach(id=>$(id).addEventListener("input",()=>{C.givenTouched=false;C.confirmBig=false;renderCalc()}));
+["cExercise","cLow","cBed","cSick"].forEach(id=>$(id).addEventListener("change",()=>{C.givenTouched=false;renderCalc()}));
+$("fAdd").addEventListener("click",()=>{const n=$("fName").value.trim();const c=num($("fCarbs").value);if(!n||c==null)return toast("Enter the food and its carbs.");C.foods.push({name:n,carbs:c});$("fName").value="";$("fCarbs").value="";syncCarbsFromFoods();renderFoods();renderCalc();if(!S.foods.some(f=>f.name.toLowerCase()===n.toLowerCase()&&f.carbs===c))addDoc("foods",{name:n,carbs:c})});
+$("sfAdd").addEventListener("click",async()=>{const n=$("sfName").value.trim();const c=num($("sfCarbs").value);if(!n||c==null)return toast("Enter the food and its carbs.");await addDoc("foods",{name:n,carbs:c});$("sfName").value="";$("sfCarbs").value="";toast("Food saved.")});
+$("sSave").addEventListener("click",saveSettingsForm);
+$("sSame").addEventListener("click",async()=>{await saveSettings({lastReviewed:Date.now()});toast("Thanks. Numbers confirmed.")});
+["sRatio","sTarget","sDay","sNight","sReview","sMax"].forEach(id=>$(id).addEventListener("input",()=>{S.sDirty=true}));
+
+function renderAll(){renderHeader();renderBanners();renderFoods();renderCalc();renderLog();renderTrends();renderSettings(false)}
+lsLoad();
+renderAll();
+let tab="calc";try{tab=localStorage.getItem(LS+"-tab")||"calc"}catch(e){}
+show(["calc","log","trends","settings"].includes(tab)?tab:"calc");
+connectDb();
+setInterval(()=>{if(S.view==="calc")renderCalc();renderBanners()},30000);
+})();
+</script>
+
+</body>
+</html>
