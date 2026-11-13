@@ -279,8 +279,8 @@ nav.tabs button[aria-selected=true]{color:var(--label)}
   <div class="card" style="max-width:380px;width:100%;text-align:center">
     <img src="icon-192.png" alt="" width="72" height="72" style="margin:0 auto;border-radius:16px">
     <h1>Jackson's Bolus</h1>
-    <p class="sub" style="margin:0">Type the family code once to open his shared log. Everyone with the same code sees the same log.</p>
-    <input id="gateCode" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Family code" aria-label="Family code" style="text-align:center;font-size:1.1rem">
+    <p class="sub" style="margin:0">Type the family PIN once. Everyone with the same PIN sees the same log. The first time, make one up.</p>
+    <input id="gateCode" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="4-digit PIN" aria-label="4-digit PIN" style="text-align:center;font-size:1.6rem;letter-spacing:.4em">
     <p id="gateMsg" style="margin:0;color:var(--bad);font-weight:600"></p>
     <button class="btn" id="gateIn" type="button">Open the log</button>
     <button class="btn alt" id="gateOut" type="button">Use this phone only for now</button>
@@ -387,7 +387,7 @@ function startSync(code){
   }else{try{localStorage.setItem(upKey,"1")}catch(e){}}
   const timer=setTimeout(()=>{S.slow=true;renderBanners()},10000);
   const done=()=>{clearTimeout(timer);S.slow=false};
-  const denied=e=>{done();if(e&&e.code==="permission-denied"){db=null;S.mode="local";setCode("");showGate("That code didn't work. Check it and try again.")}};
+  const denied=e=>{done();if(e&&e.code==="permission-denied"){db=null;S.mode="local";setCode("");showGate("That PIN didn't work. Check it and try again.")}};
   unsubs.push(db.doc("app/settings").onSnapshot(s=>{if(!s.metadata.fromCache)done();if(!s.exists&&localSettings&&!s.metadata.fromCache){db.doc("app/settings").set(localSettings).catch(()=>{})}S.settingsExists=s.exists;S.settings={...DEFAULTS,...(s.exists?s.data():localSettings||{})};renderAll()},denied));
   unsubs.push(db.collection("log").orderBy("at","desc").limit(1000).onSnapshot(q=>{if(!q.metadata.fromCache)done();S.log=q.docs.map(d=>({...d.data(),id:d.id}));renderAll()},denied));
   unsubs.push(db.collection("foods").onSnapshot(q=>{S.foods=q.docs.map(d=>({...d.data(),id:d.id}));renderAll()},denied));
@@ -396,9 +396,9 @@ function startSync(code){
 function showGate(msg){const g=document.getElementById("gate");g.hidden=false;document.getElementById("gateMsg").textContent=msg||""}
 function hideGate(){document.getElementById("gate").hidden=true}
 document.getElementById("gateIn").addEventListener("click",()=>{
-  const c=(document.getElementById("gateCode").value||"").trim().toLowerCase().replace(/\s+/g,"-");
-  if(c.length<8)return showGate("The code needs at least 8 letters or numbers.");
-  if(!/^[a-z0-9-]+$/.test(c))return showGate("Use only letters, numbers and dashes.");
+  const pin=(document.getElementById("gateCode").value||"").trim();
+  if(!/^\d{4}$/.test(pin))return showGate("Type 4 numbers.");
+  const c="jackson-"+pin;
   setCode(c);hideGate();if(authUser)startSync(c);
 });
 document.getElementById("gateOut").addEventListener("click",()=>{S.skipCode=true;hideGate()});
@@ -623,7 +623,7 @@ function renderSettings(force){
   $("savedFoods").innerHTML=S.foods.length?S.foods.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(f=>'<div><span>'+esc(f.name)+'</span><span class="tnum">'+fmtU(f.carbs)+' g <button class="x" type="button" data-delfood="'+esc(f.id)+'" aria-label="Delete">×</button></span></div>').join(""):'<span class="sub">No saved foods yet.</span>';
   const hs=S.history.slice().sort((a,b)=>b.at-a.at);
   $("hist").innerHTML=hs.length?hs.map(x=>'<div class="tnum"><b>'+new Date(x.at).toLocaleDateString([], {month:"numeric",day:"numeric",year:"2-digit"})+'</b> '+esc(x.what)+': '+esc(x.from)+' → '+esc(x.to)+'</div>').join(""):'<span class="sub">Changes you save show up here.</span>';
-  $("storeNote").innerHTML=S.mode==="shared"?"The log is shared with everyone who uses the family code <b>"+esc(S.code||"")+"</b>.":"Not connected to the shared log. Entries are saved on this phone only."+(window.FIREBASE_CONFIG?' <button class="btn small alt" type="button" data-act="changeCode">Enter family code</button>':'');
+  $("storeNote").innerHTML=S.mode==="shared"?"The log is shared with everyone who uses PIN <b>"+esc((S.code||"").replace("jackson-",""))+"</b>.":"Not connected to the shared log. Entries are saved on this phone only."+(window.FIREBASE_CONFIG?' <button class="btn small alt" type="button" data-act="changeCode">Enter family PIN</button>':'');
 }
 async function saveSettingsForm(){
   const st=S.settings;const nv={ratio:num($("sRatio").value),target:num($("sTarget").value),dayFactor:num($("sDay").value),nightFactor:num($("sNight").value),reviewDays:num($("sReview").value),maxUnits:num($("sMax").value)};
