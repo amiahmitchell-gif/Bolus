@@ -139,6 +139,12 @@ nav.tabs button[aria-selected=true]{color:var(--label)}
 <style>:root{padding-top:env(safe-area-inset-top,0px)}body{margin:0}img{max-width:100%}</style>
 </head>
 <body>
+<div id="phoneOnly" hidden style="position:fixed;inset:0;z-index:50;background:var(--pen);color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center">
+  <img src="icon-192.png" alt="" width="96" height="96" style="border-radius:22px">
+  <div style="font-family:var(--display);font-weight:800;font-size:1.8rem">Made for phones only</div>
+  <div style="opacity:.9;max-width:320px">Open this on your phone to use Jackson's calculator.</div>
+</div>
+<script>(function(){var desk=window.matchMedia("(pointer:fine)").matches&&!("ontouchstart" in window)&&!(navigator.maxTouchPoints>0);if(desk){var d=document.getElementById("phoneOnly");d.hidden=false;d.style.display="flex"}})()</script>
 <div id="splash" aria-hidden="true" style="position:fixed;inset:0;z-index:40;background:var(--pen);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center;transition:opacity .5s ease">
   <img src="icon-512.png" alt="" width="120" height="120" style="border-radius:28px;box-shadow:0 8px 24px rgba(0,0,0,.25)">
   <div style="font-family:var(--display);font-weight:800;font-size:2rem;line-height:1.1">Jackson's</div>
