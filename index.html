@@ -394,12 +394,12 @@ function startSync(code){
     batch.commit().then(()=>{try{localStorage.setItem(upKey,"1")}catch(e){}}).catch(()=>{});
   }else{try{localStorage.setItem(upKey,"1")}catch(e){}}
   const timer=setTimeout(()=>{S.slow=true;renderBanners()},10000);
-  const done=()=>{clearTimeout(timer);S.slow=false};
+  const done=()=>{clearTimeout(timer);if(S.slow){S.slow=false;renderBanners()}};
   const denied=e=>{done();if(e&&e.code==="permission-denied"){db=null;S.mode="local";setCode("");showGate("That PIN didn't work. Check it and try again.")}};
-  unsubs.push(db.doc("app/settings").onSnapshot(s=>{if(!s.metadata.fromCache)done();if(!s.exists&&localSettings&&!s.metadata.fromCache){db.doc("app/settings").set(localSettings).catch(()=>{})}S.settingsExists=s.exists;S.settings={...DEFAULTS,...(s.exists?s.data():localSettings||{})};renderAll()},denied));
-  unsubs.push(db.collection("log").orderBy("at","desc").limit(1000).onSnapshot(q=>{if(!q.metadata.fromCache)done();S.log=q.docs.map(d=>({...d.data(),id:d.id}));renderAll()},denied));
-  unsubs.push(db.collection("foods").onSnapshot(q=>{S.foods=q.docs.map(d=>({...d.data(),id:d.id}));renderAll()},denied));
-  unsubs.push(db.collection("history").orderBy("at","desc").limit(200).onSnapshot(q=>{S.history=q.docs.map(d=>({...d.data(),id:d.id}));renderAll()},denied));
+  unsubs.push(db.doc("app/settings").onSnapshot({includeMetadataChanges:true},s=>{if(!s.metadata.fromCache)done();if(!s.exists&&localSettings&&!s.metadata.fromCache){db.doc("app/settings").set(localSettings).catch(()=>{})}S.settingsExists=s.exists;S.settings={...DEFAULTS,...(s.exists?s.data():localSettings||{})};renderAll()},denied));
+  unsubs.push(db.collection("log").orderBy("at","desc").limit(1000).onSnapshot({includeMetadataChanges:true},q=>{if(!q.metadata.fromCache)done();S.log=q.docs.map(d=>({...d.data(),id:d.id}));renderAll()},denied));
+  unsubs.push(db.collection("foods").onSnapshot({includeMetadataChanges:true},q=>{if(!q.metadata.fromCache)done();S.foods=q.docs.map(d=>({...d.data(),id:d.id}));renderAll()},denied));
+  unsubs.push(db.collection("history").orderBy("at","desc").limit(200).onSnapshot({includeMetadataChanges:true},q=>{S.history=q.docs.map(d=>({...d.data(),id:d.id}));renderAll()},denied));
 }
 function showGate(msg){const g=document.getElementById("gate");g.hidden=false;document.getElementById("gateMsg").textContent=msg||""}
 function hideGate(){document.getElementById("gate").hidden=true}
