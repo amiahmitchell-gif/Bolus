@@ -139,6 +139,12 @@ nav.tabs button[aria-selected=true]{color:var(--label)}
 <style>:root{padding-top:env(safe-area-inset-top,0px)}body{margin:0}img{max-width:100%}</style>
 </head>
 <body>
+<div id="splash" aria-hidden="true" style="position:fixed;inset:0;z-index:40;background:var(--pen);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center;transition:opacity .5s ease">
+  <img src="icon-512.png" alt="" width="120" height="120" style="border-radius:28px;box-shadow:0 8px 24px rgba(0,0,0,.25)">
+  <div style="font-family:var(--display);font-weight:800;font-size:2rem;line-height:1.1">Jackson's</div>
+  <div style="font-family:var(--display);font-weight:600;font-size:1.15rem;opacity:.9;max-width:280px">Blood Glucose Bolus Calculator</div>
+</div>
+<script>setTimeout(function(){var s=document.getElementById("splash");if(!s)return;s.style.opacity="0";setTimeout(function(){s.remove()},500)},1600)</script>
 <div class="wrap">
   <header class="top">
     <div>
