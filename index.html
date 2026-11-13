@@ -497,6 +497,7 @@ function renderLog(){
     if(e.tags&&e.tags.length)h+='<div class="meta">'+e.tags.map(esc).join(" · ")+'</div>';
     if(e.type==="dose"&&e.ratio)h+='<div class="meta tnum">Used ratio '+fmtU(e.ratio)+', target '+e.target+', factor '+e.factor+(e.rounded!=null&&e.rounded!==e.given?' · app said '+fmtU(e.rounded)+' u':'')+(e.skipped&&e.skipped.length?' · no correction: '+e.skipped.map(esc).join("; "):'')+'</div>';
     if(e.note)h+='<div class="meta">'+esc(e.note)+'</div>';
+    if(e.type==="dose")h+='<div class="inline"><input type="text" placeholder="What he ate" id="af-'+esc(e.id)+'" aria-label="Add food eaten"><button class="btn small alt" type="button" data-addfood="'+esc(e.id)+'">Add food</button></div>';
     h+='<div class="inline">';
     if(e.type==="dose"&&e.afterBg==null)h+='<input type="number" inputmode="numeric" placeholder="2-hr BG" id="ab-'+esc(e.id)+'" aria-label="Blood sugar 2 hours after"><button class="btn small alt" type="button" data-after="'+esc(e.id)+'">Save</button>';
     h+=(S.confirmDel===e.id?'<button class="btn small danger" type="button" data-del="'+esc(e.id)+'">Yes, delete</button><button class="btn small alt" type="button" data-nodel="1">Keep</button>':'<button class="x" type="button" data-askdel="'+esc(e.id)+'" style="margin-left:auto;font-size:.85rem">Delete</button>');
@@ -628,6 +629,7 @@ document.addEventListener("click",async ev=>{
   if(b.dataset.food){const f=S.foods.find(x=>x.id===b.dataset.food);if(f){C.foods.push({name:f.name,carbs:f.carbs});if(f.tag&&!C.tags.includes(f.tag))C.tags.push(f.tag);syncCarbsFromFoods();renderFoods();renderCalc()}return}
   if(b.dataset.unpick!=null){C.foods.splice(+b.dataset.unpick,1);syncCarbsFromFoods();if(!C.foods.length)$("carbs").value="";renderFoods();renderCalc();return}
   if(b.dataset.q){renderQuick(S.quick===b.dataset.q?null:b.dataset.q);return}
+  if(b.dataset.addfood){const id=b.dataset.addfood,v=(($("af-"+id)||{}).value||"").trim();if(!v)return toast("Type what he ate.");const e=S.log.find(x=>x.id===id);if(!e)return;await updDoc("log",id,{foods:(e.foods||[]).concat([{name:v}])});toast("Food added.");return}
   if(b.dataset.after){const v=num(($("ab-"+b.dataset.after)||{}).value);if(v==null)return toast("Enter the 2-hour blood sugar.");await updDoc("log",b.dataset.after,{afterBg:v,afterAt:Date.now()});toast("Saved.");return}
   if(b.dataset.askdel){S.confirmDel=b.dataset.askdel;renderLog();return}
   if(b.dataset.nodel){S.confirmDel=null;renderLog();return}
