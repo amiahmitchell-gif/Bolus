@@ -169,7 +169,7 @@ nav.tabs button[aria-selected=true]{color:var(--label)}
       </div>
       <div class="row">
         <label class="f">Carb ratio (today's)
-          <input id="ratioIn" class="big-in tnum" type="number" inputmode="decimal" min="1" step="1" placeholder="e.g. 60">
+          <input id="ratioIn" class="big-in tnum" type="number" inputmode="decimal" min="1" step="1">
         </label>
         <label class="f">Correction factor
           <input id="factorIn" class="big-in tnum" type="number" inputmode="numeric" min="1" step="1" placeholder="100 or 200">
@@ -203,10 +203,12 @@ nav.tabs button[aria-selected=true]{color:var(--label)}
     <div class="card">
       <h3>What is he eating?</h3>
       <div class="foods" id="foodChips"></div>
-      <div class="row">
-        <label class="f">Food<input id="fName" type="text" placeholder="e.g. Turkey sandwich and apple slices"></label>
-        <label class="f" style="flex:0 1 110px">Carbs (g)<input id="fCarbs" type="number" inputmode="decimal" min="0" step="0.5"></label>
-        <button class="btn small" id="fAdd" type="button" style="flex:0 0 auto">Add</button>
+      <label class="f" style="display:block">Food
+        <textarea id="fName" rows="3" style="width:100%;box-sizing:border-box;font:inherit;font-size:1.15rem;line-height:1.4;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);resize:vertical;margin-top:4px"></textarea>
+      </label>
+      <div class="row" style="align-items:flex-end">
+        <label class="f">Carbs (g)<input id="fCarbs" class="big-in tnum" type="number" inputmode="decimal" min="0" step="0.5"></label>
+        <button class="btn" id="fAdd" type="button" style="flex:0 0 auto;min-width:96px">Add</button>
       </div>
       <div class="picked" id="picked"></div>
       <div id="tagSeg" hidden></div>
@@ -259,7 +261,7 @@ nav.tabs button[aria-selected=true]{color:var(--label)}
       <h2>Saved foods</h2>
       <p class="sub" style="margin:0">Foods typed on the calculator are saved here automatically and show up as quick buttons next time.</p>
       <div class="row">
-        <label class="f">Food<input id="sfName" type="text" placeholder="e.g. Goldfish pouch"></label>
+        <label class="f">Food<input id="sfName" type="text"></label>
         <label class="f" style="flex:0 1 110px">Carbs (g)<input id="sfCarbs" type="number" inputmode="decimal" min="0" step="0.5"></label>
         <button class="btn small" id="sfAdd" type="button" style="flex:0 0 auto">Save</button>
       </div>
@@ -542,7 +544,7 @@ function renderQuick(kind){
   let h='';const when='<label class="f">When<input id="qAt" type="datetime-local" value="'+nowLocal()+'"></label>';
   if(kind==="bg")h='<div class="row"><label class="f">Blood sugar<input id="qBg" type="number" inputmode="numeric"></label>'+when+'</div>';
   if(kind==="low")h='<div class="row"><label class="f">Blood sugar<input id="qBg" type="number" inputmode="numeric"></label><label class="f">Grams given<input id="qG" type="number" inputmode="decimal" value="15"></label></div><div class="row"><label class="f">Kind<select id="qKind"><option>Fast-acting</option><option>Complex (PB toast, granola bar)</option></select></label>'+when+'</div>';
-  if(kind==="snack")h='<div class="row"><label class="f">What<input id="qNote" type="text" placeholder="e.g. cheese stick"></label>'+when+'</div>';
+  if(kind==="snack")h='<div class="row"><label class="f">What<input id="qNote" type="text"></label>'+when+'</div>';
   if(kind==="basal")h='<div class="row"><label class="f">Units<input id="qU" type="number" inputmode="decimal" step="0.5" value="3.5"></label>'+when+'</div><p class="sub" style="margin:0">Long-acting does not count toward the 3-hour wait.</p>';
   if(kind==="dose")h='<div class="row"><label class="f">Units given<input id="qU" type="number" inputmode="decimal" step="0.5"></label><label class="f">Blood sugar<input id="qBg" type="number" inputmode="numeric"></label></div><div class="row"><label class="f">Carbs (g)<input id="qC" type="number" inputmode="decimal"></label><label class="f">Meal<select id="qMeal"><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select></label></div><div class="row">'+when+'</div><p class="sub" style="margin:0">Use this for a dose given without the calculator, so the 3-hour wait is right.</p>';
   if(kind)h+='<button class="btn" type="button" data-act="quickSave">Save to log</button>';
