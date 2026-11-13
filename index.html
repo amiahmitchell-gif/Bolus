@@ -279,10 +279,11 @@ nav.tabs button[aria-selected=true]{color:var(--label)}
   <div class="card" style="max-width:380px;width:100%;text-align:center">
     <img src="icon-192.png" alt="" width="72" height="72" style="margin:0 auto;border-radius:16px">
     <h1>Jackson's Bolus</h1>
-    <p class="sub" style="margin:0">Sign in with Google to open his shared log.</p>
+    <p class="sub" style="margin:0">Type the family code once to open his shared log. Everyone with the same code sees the same log.</p>
+    <input id="gateCode" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Family code" aria-label="Family code" style="text-align:center;font-size:1.1rem">
     <p id="gateMsg" style="margin:0;color:var(--bad);font-weight:600"></p>
-    <button class="btn" id="gateIn" type="button">Sign in with Google</button>
-    <button class="btn alt" id="gateOut" type="button" hidden>Sign out</button>
+    <button class="btn" id="gateIn" type="button">Open the log</button>
+    <button class="btn alt" id="gateOut" type="button">Use this phone only for now</button>
   </div>
 </div>
 <nav class="tabs" aria-label="Sections"><div class="in" role="tablist">
@@ -351,35 +352,57 @@ async function delDoc(coll,id){
   if(db){try{await db.collection(coll).doc(id).delete()}catch(e){toast("Could not delete.")}}
   else{S[coll]=S[coll].filter(x=>x.id!==id);lsSave();renderAll()}
 }
+const CODE_KEY=LS+"-code";
+function getCode(){try{return localStorage.getItem(CODE_KEY)||""}catch(e){return""}}
+function setCode(c){try{c?localStorage.setItem(CODE_KEY,c):localStorage.removeItem(CODE_KEY)}catch(e){}}
+let fsRef=null,authUser=null;
 function connectDb(){
   const cfg=window.FIREBASE_CONFIG;
   if(!cfg||!window.firebase){return}
   try{firebase.initializeApp(cfg)}catch(e){}
-  const fs=firebase.firestore();
-  try{fs.enablePersistence({synchronizeTabs:true}).catch(()=>{})}catch(e){}
+  fsRef=firebase.firestore();
+  try{fsRef.enablePersistence({synchronizeTabs:true}).catch(()=>{})}catch(e){}
   const auth=firebase.auth();
-  auth.getRedirectResult().catch(e=>{showGate("Sign-in didn't finish. Try again.")});
   auth.onAuthStateChanged(u=>{
-    if(!u){db=null;showGate();return}
-    hideGate();startSync(fs,u);
+    authUser=u;
+    if(!u){auth.signInAnonymously().catch(()=>{S.offlineNote=true;renderBanners()});return}
+    const c=getCode();
+    if(c){hideGate();startSync(c)}else if(!S.skipCode){showGate()}
   });
 }
 let unsubs=[];
-function startSync(fs,u){
+function startSync(code){
   unsubs.forEach(f=>f());unsubs=[];
-  db=fs;S.mode="shared";S.user=u.email;
+  const fam=fsRef.collection("families").doc(code);
+  db={collection:n=>fam.collection(n),doc:p=>{const [c,d]=p.split("/");return fam.collection(c).doc(d)}};
+  S.mode="shared";S.code=code;
+  // Copy anything saved on this phone before it joined the shared log (once per code).
+  const upKey=LS+"-uploaded-"+code;let uploaded=false;try{uploaded=!!localStorage.getItem(upKey)}catch(e){}
+  const localLog=S.log.slice(),localFoods=S.foods.slice(),localSettings=S.settingsExists?{...S.settings}:null;
+  if(!uploaded&&(localLog.length||localFoods.length)){
+    const batch=fsRef.batch();
+    localLog.forEach(e=>{const {id,...d}=e;batch.set(fam.collection("log").doc(id),d,{merge:true})});
+    localFoods.forEach(f=>{const {id,...d}=f;batch.set(fam.collection("foods").doc(id),d,{merge:true})});
+    batch.commit().then(()=>{try{localStorage.setItem(upKey,"1")}catch(e){}}).catch(()=>{});
+  }else{try{localStorage.setItem(upKey,"1")}catch(e){}}
   const timer=setTimeout(()=>{S.slow=true;renderBanners()},10000);
   const done=()=>{clearTimeout(timer);S.slow=false};
-  const denied=e=>{done();if(e&&e.code==="permission-denied"){showGate("The account "+u.email+" isn't allowed to see this log. Ask Amiah to add it, or sign in with a different Google account.",true)}};
-  unsubs.push(db.doc("app/settings").onSnapshot({includeMetadataChanges:false},s=>{if(!s.metadata.fromCache)done();S.settingsExists=s.exists;S.settings={...DEFAULTS,...(s.exists?s.data():{})};renderAll()},denied));
+  const denied=e=>{done();if(e&&e.code==="permission-denied"){db=null;S.mode="local";setCode("");showGate("That code didn't work. Check it and try again.")}};
+  unsubs.push(db.doc("app/settings").onSnapshot(s=>{if(!s.metadata.fromCache)done();if(!s.exists&&localSettings&&!s.metadata.fromCache){db.doc("app/settings").set(localSettings).catch(()=>{})}S.settingsExists=s.exists;S.settings={...DEFAULTS,...(s.exists?s.data():localSettings||{})};renderAll()},denied));
   unsubs.push(db.collection("log").orderBy("at","desc").limit(1000).onSnapshot(q=>{if(!q.metadata.fromCache)done();S.log=q.docs.map(d=>({...d.data(),id:d.id}));renderAll()},denied));
   unsubs.push(db.collection("foods").onSnapshot(q=>{S.foods=q.docs.map(d=>({...d.data(),id:d.id}));renderAll()},denied));
   unsubs.push(db.collection("history").orderBy("at","desc").limit(200).onSnapshot(q=>{S.history=q.docs.map(d=>({...d.data(),id:d.id}));renderAll()},denied));
 }
-function showGate(msg,signOut){const g=document.getElementById("gate");g.hidden=false;document.getElementById("gateMsg").textContent=msg||"";document.getElementById("gateOut").hidden=!signOut}
+function showGate(msg){const g=document.getElementById("gate");g.hidden=false;document.getElementById("gateMsg").textContent=msg||""}
 function hideGate(){document.getElementById("gate").hidden=true}
-document.getElementById("gateIn").addEventListener("click",()=>{const p=new firebase.auth.GoogleAuthProvider();firebase.auth().signInWithRedirect(p)});
-document.getElementById("gateOut").addEventListener("click",()=>{firebase.auth().signOut()});
+document.getElementById("gateIn").addEventListener("click",()=>{
+  const c=(document.getElementById("gateCode").value||"").trim().toLowerCase().replace(/\s+/g,"-");
+  if(c.length<8)return showGate("The code needs at least 8 letters or numbers.");
+  if(!/^[a-z0-9-]+$/.test(c))return showGate("Use only letters, numbers and dashes.");
+  setCode(c);hideGate();if(authUser)startSync(c);
+});
+document.getElementById("gateOut").addEventListener("click",()=>{S.skipCode=true;hideGate()});
+function changeCode(){unsubs.forEach(f=>f());unsubs=[];db=null;S.mode="local";setCode("");lsLoad();renderAll();S.skipCode=false;showGate()}
 
 /* ---------- calculator state ---------- */
 const C={meal:null,foods:[],tags:[],given:null,givenTouched:false,confirmBig:false};
@@ -600,7 +623,7 @@ function renderSettings(force){
   $("savedFoods").innerHTML=S.foods.length?S.foods.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(f=>'<div><span>'+esc(f.name)+'</span><span class="tnum">'+fmtU(f.carbs)+' g <button class="x" type="button" data-delfood="'+esc(f.id)+'" aria-label="Delete">×</button></span></div>').join(""):'<span class="sub">No saved foods yet.</span>';
   const hs=S.history.slice().sort((a,b)=>b.at-a.at);
   $("hist").innerHTML=hs.length?hs.map(x=>'<div class="tnum"><b>'+new Date(x.at).toLocaleDateString([], {month:"numeric",day:"numeric",year:"2-digit"})+'</b> '+esc(x.what)+': '+esc(x.from)+' → '+esc(x.to)+'</div>').join(""):'<span class="sub">Changes you save show up here.</span>';
-  $("storeNote").textContent=S.mode==="shared"?"The log is shared between the family accounts allowed to see it. Signed in as "+(S.user||"")+".":"Not connected to the shared log yet. Entries are saved on this phone only.";
+  $("storeNote").innerHTML=S.mode==="shared"?"The log is shared with everyone who uses the family code <b>"+esc(S.code||"")+"</b>.":"Not connected to the shared log. Entries are saved on this phone only."+(window.FIREBASE_CONFIG?' <button class="btn small alt" type="button" data-act="changeCode">Enter family code</button>':'');
 }
 async function saveSettingsForm(){
   const st=S.settings;const nv={ratio:num($("sRatio").value),target:num($("sTarget").value),dayFactor:num($("sDay").value),nightFactor:num($("sNight").value),reviewDays:num($("sReview").value),maxUnits:num($("sMax").value)};
@@ -646,6 +669,7 @@ document.addEventListener("click",async ev=>{
   if(a==="plus"){C.given=Math.min(30,(C.given||0)+0.5);C.givenTouched=true;C.confirmBig=false;renderCalc()}
   if(a==="confirmBig"){C.confirmBig=true;renderCalc()}
   if(a==="logDose")await logDose();
+  if(a==="changeCode")changeCode();
   if(a==="logBg"){const r=compute();await addDoc("log",{type:"bg",at:Date.now(),bg:r.bg});resetCalc();toast("Blood sugar logged.")}
   if(a==="logLow"){const r=compute();await addDoc("log",{type:"low",at:Date.now(),bg:r.bg,grams:15,kind:"Fast-acting"});resetCalc();toast("Low logged. Recheck in 15 minutes.")}
   if(a==="same"){await saveSettings({lastReviewed:Date.now()});toast("Thanks. Numbers confirmed.")}
