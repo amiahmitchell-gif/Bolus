@@ -134,6 +134,11 @@ nav.tabs button[aria-selected=true]{color:var(--label)}
 .hist{font-size:.88rem;display:flex;flex-direction:column;gap:4px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;z-index:20;max-width:90vw}
 @media (prefers-reduced-motion:no-preference){.answer{transition:background .2s,border-color .2s}}
+.guide details{border-top:1px solid var(--line);padding:10px 0}
+.guide summary{font-weight:700;cursor:pointer;font-size:1.05rem}
+.guide p,.guide ul{margin:8px 0 0;line-height:1.5}
+.guide ul{padding-left:20px}
+.guide a{color:var(--pen);font-weight:700}
 </style>
 
 <style>:root{padding-top:env(safe-area-inset-top,0px)}body{margin:0}img{max-width:100%}</style>
@@ -272,6 +277,31 @@ nav.tabs button[aria-selected=true]{color:var(--label)}
         <button class="btn small" id="sfAdd" type="button" style="flex:0 0 auto">Save</button>
       </div>
       <div class="picked" id="savedFoods"></div>
+    </div>
+    <div class="card guide">
+      <h2>How it works</h2>
+      <p class="sub" style="margin:0">A quick refresher from his care team's bolus worksheet.</p>
+      <details open><summary>1) Carb bolus</summary>
+        <p><b>Carbs ÷ carb ratio</b>. A ratio of 60 means 1 unit covers 60 g of carbs. The ratio changes often, so type today's number each time.</p></details>
+      <details><summary>2) Correction bolus</summary>
+        <p><b>(Blood sugar − 120) ÷ correction factor</b>. Target is 120, the top of his 70–120 range. Factor is 100 during the day and 200 after dinner. A factor of 100 means 1 unit lowers him about 100 points.</p></details>
+      <details><summary>No correction when…</summary>
+        <ul><li>Blood sugar is below 120</li><li>It's been less than 3 hours since his last fast-acting insulin</li><li>A low was treated in the last 3 hours</li><li>Less than 1 hour after hard exercise</li><li>Bedtime or overnight (until his team says otherwise)</li></ul>
+        <p>He still gets the carb bolus for food.</p></details>
+      <details><summary>3) Total and rounding (½ unit)</summary>
+        <p><b>Carb bolus + correction</b>, then round:</p>
+        <ul><li>.1 to .3 → round <b>down</b> to the whole unit</li><li>.4 to .7 → round to the <b>½</b> unit</li><li>.8 to .9 → round <b>up</b> to the whole unit</li></ul>
+        <p>Example: 2.3 → 2, 2.4 → 2.5, 2.8 → 3. One click on his half-unit pen is 0.5 units.</p></details>
+      <details><summary>Always 3 hours between doses</summary>
+        <p>Wait 3 hours between fast-acting doses. 0-carb snacks are fine in between. Log every dose, even ones given without the app, so the wait timer is right.</p></details>
+      <details><summary>Long-acting insulin</summary>
+        <p>3.5 units every night at 8 pm (his team may change it). It doesn't count toward the 3-hour wait.</p></details>
+      <details><summary>Lows</summary>
+        <p>70 or under: no insulin. Give 15 g of fast-acting carbs right away, then recheck. 71–80 and dropping: a 15 g snack with complex carbs, like peanut butter toast or a nut granola bar.</p></details>
+      <details><summary>Ketones and sick days</summary>
+        <p>Check ketones if blood sugar is over 300 or he's sick, no matter the number. Follow his care team's sick-day plan and call them if ketones show up.</p></details>
+      <details><summary>Care team</summary>
+        <p>Nationwide Children's diabetes office: <a href="tel:6147224425">614-722-4425</a>. This app helps with the math. It doesn't replace his care team.</p></details>
     </div>
     <div class="card">
       <h2>Change history</h2>
